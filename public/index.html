@@ -55,7 +55,7 @@
             engine.enableOfflineSupport = false;
             // LIGHT
             var light = new BABYLON.PointLight("light", new BABYLON.Vector3(50, 30, 30), scene);
-            var light = new BABYLON.PointLight("light", new BABYLON.Vector3(-230, 30, 180), scene);
+            var light2 = new BABYLON.PointLight("light2", new BABYLON.Vector3(-230, 30, 180), scene);
 
             // GRAVITY
             scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
@@ -102,7 +102,6 @@
             //VIRUS
             
             //first virus (use for copy)
-            var virus_array = []; //array when we put all virus
             var box = BABYLON.MeshBuilder.CreateBox("box", {size : 6}, scene); //make a box
             var virus = { model: box, life: 20, speed: 1, pos : ((gridSize - 1) + (gridSize - 1))}; //create and object to save more informations
             virus.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map 
@@ -112,15 +111,26 @@
 
             //clone virus and put the copys into virus_array
             setIntervalX(function () {
-            if(!scene.isReady()) return;
-            var virusCopy = { model: undefined};
-            var x = Object.assign(virusCopy, virus);
-            virusCopy.model.isVisible = true;
-            virusCopy.model.material = towerLevel1;
-            virus_array.push(virusCopy);
+                if(!scene.isReady()) return;
+                let virusCopy = Object.assign({}, virus);
+                virusCopy.model = box.clone();
+                virusCopy.model.isVisible = true;
+                virusCopy.model.material = towerLevel1;
+                virusCopy.model.name = "Virus " + virus_array.length;
+                virus_array.push(virusCopy);
             }, 1000, 5);
-        
-            
+
+            // Code in this function will run ~60 times per second
+            scene.registerBeforeRender(function () {
+                for (let i = 0; i < virus_array.length; i++) {
+                    let virus = virus_array[i];
+                    let speed = virus.speed;
+
+                    virus.model.position.x += speed / 60;
+                }
+            });
+
+
             //handling of hex tile picking
             scene.onPointerDown = function (event, pickResult) {
                 let pickedMesh = pickResult.pickedMesh
@@ -165,7 +175,9 @@
         };
         var rand = function(min, max){ return Math.floor(Math.random()*(max-min+1)+min)};
 
+        var virus_array = []; //array when we put all virus
         let scene = createScene();
+
         engine.runRenderLoop(function () {
             scene.render();
         });
