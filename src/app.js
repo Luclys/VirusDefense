@@ -1,0 +1,183 @@
+//Can make actions every x milleseconds y times
+function setIntervalX(callback, delay, repetition) {
+    var x = 0;
+    var intervalID = setInterval(function () {
+        callback()
+        if (++x === repetition) {
+            clearInterval(intervalID);
+        }
+    }, delay);
+}
+
+function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
+    return function () {
+        if (!scene.isReady()) return;
+        let virusCopy = Object.assign({}, originalVirus);
+        virusCopy.model = originalVirus.model.clone("Virus " + virus_array.length);
+        virusCopy.model.isVisible = true;
+        virusCopy.model.material = towerLevel1;
+        virus_array.push(virusCopy);
+    };
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+    var canvas = document.getElementById('render_canvas');
+    var engine = new BABYLON.Engine(canvas, true);
+
+    var createScene = function () {
+        let gridSize = 10;
+        let hexHeightSize = 3;
+        let hexLength = 7;
+        let hexSpacing = 0.01;
+        // Not actually Spacing... more like reducing the size to make the illusion it is separated. My math aren't good enough.
+        let hexWidthDistance = (Math.sqrt(3) * hexLength);
+        let hexHeightDistance = (2 * hexLength);
+        let rowLengthAddition = 0;
+
+
+        // SCENE
+        var scene = new BABYLON.Scene(engine);
+        engine.enableOfflineSupport = false;
+
+        // LIGHT
+        var light = new BABYLON.PointLight("light", new BABYLON.Vector3(50, 30, 30), scene);
+        var light2 = new BABYLON.PointLight("light2", new BABYLON.Vector3(-230, 30, 180), scene);
+
+        // GRAVITY
+        scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
+
+        // CAMERA
+        var camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(10, 10, -10), scene);
+
+        // Enable Collisions
+        camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
+        scene.collisionsEnabled = true;
+        camera.checkCollisions = false;
+
+        // Custom Controls
+        camera.attachControl(scene, true);
+        camera.keysUp.push(90);    // Z
+        camera.keysLeft.push(81);  // Q
+        camera.keysDown.push(83);  // S
+        camera.keysRight.push(68); // D
+        camera.keysUpward.push(32) // SpaceBar
+        camera.keysDownward.push(16) // Shift
+
+
+        // CONSTRUCTIONS
+        // Materials
+        var turretLevel1 = new BABYLON.StandardMaterial("material", scene);
+        turretLevel1.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.9);
+
+        var towerLevel2 = new BABYLON.StandardMaterial("material", scene);
+        towerLevel2.emissiveColor = new BABYLON.Color3(0.2, 0.4, 0.9);
+
+        var testMaterial = new BABYLON.StandardMaterial("material", scene);
+        testMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.3);
+
+
+        //create the hex grid
+        createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDistance, rowLengthAddition, hexSpacing, scene);
+
+        let firstHexaMesh = scene.getMeshByName("hexTile00");
+        firstHexaMesh.material = testMaterial;
+        let middleHexaMesh = scene.getMeshByName("hexTile" + (gridSize - 1) + (gridSize - 1));
+        middleHexaMesh.material = testMaterial;
+
+
+        //VIRUS
+        //first virus (used for cloning)
+        let virusSize = 6;
+        let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: virusSize}, scene); //make a box
+        var originalVirus = {model: originalVirusMesh, life: 20, speed: 4, pos: ((gridSize - 1) + (gridSize - 1))}; //create an object to save more information
+        originalVirus.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map
+        originalVirus.model.position.y = hexHeightSize / 2 + virusSize / 2;
+        originalVirus.model.isVisible = false;
+
+
+        //clone virus and put the copies into virus_array 5 times with 5000 ms delay
+        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1, virus_array), 5000, 5);
+
+
+        //first turret lv1 (used for cloning)
+        let turretSize = hexHeightSize * 3;
+        let originalTurretMesh = BABYLON.MeshBuilder.CreateCylinder("turretLv1_ORIGINAL", {
+            height: turretSize,
+            diameter: (hexHeightDistance - hexSpacing) * 0.20,
+            tessellation: 6,
+            updatable: true
+        }, scene);
+        var originalTurret = {model: originalTurretMesh, power: 5, fireRate: 4, projectileSpeed: 9}; //create an object to save more information
+        originalTurret.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map
+        originalTurret.model.position.y = hexHeightSize / 2 + turretSize / 2;
+        originalTurret.model.isVisible = false;
+
+        //handling of hex tile picking
+        scene.onPointerDown = function (event, pickResult) {
+            let pickedMesh = pickResult.pickedMesh
+            // If a Mesh is picked with Left clic (main button)
+            // 1 -> Middle Clic, 2 -> right Clic
+            if (pickedMesh && event.button === 0) {
+                let state = pickedMesh.state;
+                console.log("You picked the " + pickedMesh.name + " it has the state : " + state);
+                switch (pickedMesh.state) {
+                    case "Buildable" :
+                        // We copy the Original Turret to create a new fresh one.
+                        let turretCopy = Object.assign({}, originalTurret);
+                        turretCopy.model = originalTurret.model.clone("turretLv1On" + pickedMesh.name)
+                        turretCopy.model.position.copyFrom(pickedMesh.position);
+                        turretCopy.model.material = turretLevel1;
+                        turretCopy.model.isVisible = true;
+
+                        turrets_array.push(turretCopy);
+
+                        //Update the "placeholder" mesh under the turret from "Buildable" to "TurretLv1".
+                        pickedMesh.state = "TurretLv1";
+                        //console.log("Building a Level 1 turret on top of " + pickedMesh.name)
+                        break;
+                    case "TurretLv1" :
+                        let turretLv1 = scene.getMeshByName("turretLv1On" + pickedMesh.name);
+                        turretLv1.name = "turretLv2On" + pickedMesh.name;
+                        turretLv1.material = towerLevel2;
+                        turretLv1.position.y += hexHeightSize;
+
+                        //Update the "placeholder" mesh under the turret from "TurretLv1" to "TurretLv2".
+                        pickedMesh.state = "TurretLv2";
+                        //console.log("Building a Level 2 turret on top of " + pickedMesh.name)
+                        break;
+                    case "TurretLv2" :
+                        console.log("You can't upgrade this turret");
+                }
+
+                if (state !== pickedMesh.state) {
+                    console.log("new State = " + pickedMesh.state);
+                }
+
+            }
+        };
+
+        // Code in this function will run ~60 times per second
+        scene.registerBeforeRender(function () {
+            // Move all viruses
+            for (let i = 0; i < virus_array.length; i++) {
+                let virus = virus_array[i];
+                let speed = virus.speed / 60;
+
+                virus.model.position.x += speed;
+                virus.model.position.z -= speed;
+            }
+        });
+
+
+        return scene;
+    };
+
+    var virus_array = []; //array when we put all virus
+    var turrets_array = []; //array when we put all turrets
+
+    let scene = createScene();
+
+    engine.runRenderLoop(function () {
+        scene.render();
+    });
+});
