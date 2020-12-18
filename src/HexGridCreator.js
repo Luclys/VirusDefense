@@ -36,3 +36,4 @@ function createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDista
         }
     }
 }
+

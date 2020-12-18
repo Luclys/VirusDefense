@@ -21,6 +21,19 @@
     // For Webstorm live coding, the script is temporally inside the .html
     // Once finished, it will be moved to the appropriates js source files.
     var rotateFactor = 0;
+    
+    //Can make actions every x milleseconds y times
+    function setIntervalX(callback, delay, repetition){ 
+                var x = 0;
+                var intervalID = setInterval (function (){
+                    callback()
+                    if (++x === repetition) {
+                        clearInterval(intervalID);
+                    }    
+                }, delay);
+            }
+
+
     window.addEventListener('DOMContentLoaded', function () {
         var canvas = document.getElementById('render_canvas');
         var engine = new BABYLON.Engine(canvas, true);
@@ -29,7 +42,7 @@
             let gridSize = 10;
             let hexHeightSize = 3;
             let hexLength = 7;
-            let hexSpacing = 0.5;
+            let hexSpacing = 0.01;
             // Not actually Spacing... more like reducing the size to make the illusion it is separated. My math aren't good enough.
             let hexWidthDistance = (Math.sqrt(3) * hexLength);
             let hexHeightDistance = (2 * hexLength);
@@ -38,10 +51,11 @@
 
             // SCENE
             var scene = new BABYLON.Scene(engine);
-            scene.clearColor = new BABYLON.Color4(1, 0.2, 0.2, 1)
-
+           
+            engine.enableOfflineSupport = false;
             // LIGHT
-            var light = new BABYLON.PointLight("light", new BABYLON.Vector3(30, 30, 30), scene);
+            var light = new BABYLON.PointLight("light", new BABYLON.Vector3(50, 30, 30), scene);
+            var light = new BABYLON.PointLight("light", new BABYLON.Vector3(-230, 30, 180), scene);
 
             // GRAVITY
             scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
@@ -54,7 +68,7 @@
             // Enable Collisions
             camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
             scene.collisionsEnabled = true;
-            camera.checkCollisions = true;
+            camera.checkCollisions = false;
 
             // Custom Controls
             camera.attachControl(scene, true);
@@ -64,9 +78,7 @@
             camera.keysRight.push(68); // D
             camera.keysUpward.push(32) // SpaceBar
             camera.keysDownward.push(17) // Ctrl
-
-
-            // MATERIALS
+            
             var towerLevel1 = new BABYLON.StandardMaterial("material", scene);
             towerLevel1.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.9);
 
@@ -84,8 +96,31 @@
             firstHexaMesh.material = testMaterial;
             let middleHexaMesh = scene.getMeshByName("hexTile" + (gridSize - 1) + (gridSize - 1));
             middleHexaMesh.material = testMaterial;
+            
+
+            
+            //VIRUS
+            
+            //first virus (use for copy)
+            var virus_array = []; //array when we put all virus
+            var box = BABYLON.MeshBuilder.CreateBox("box", {size : 6}, scene); //make a box
+            var virus = { model: box, life: 20, speed: 1, pos : ((gridSize - 1) + (gridSize - 1))}; //create and object to save more informations
+            virus.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map 
+            virus.model.position.y = 4.5;
+            virus.model.isVisible = false;
 
 
+            //clone virus and put the copys into virus_array
+            setIntervalX(function () {
+            if(!scene.isReady()) return;
+            var virusCopy = { model: undefined};
+            var x = Object.assign(virusCopy, virus);
+            virusCopy.model.isVisible = true;
+            virusCopy.model.material = towerLevel1;
+            virus_array.push(virusCopy);
+            }, 1000, 5);
+        
+            
             //handling of hex tile picking
             scene.onPointerDown = function (event, pickResult) {
                 let pickedMesh = pickResult.pickedMesh
@@ -128,7 +163,7 @@
 
             return scene;
         };
-
+        var rand = function(min, max){ return Math.floor(Math.random()*(max-min+1)+min)};
 
         let scene = createScene();
         engine.runRenderLoop(function () {
