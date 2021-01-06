@@ -1,3 +1,22 @@
+class Virus {
+    constructor(model, life, speed) {
+        this.model = model;
+        this.life = life;
+        this.speed = speed;
+        this.stepPathI = -1;
+    }
+
+    moveToNextPathStep(pathPoints) {
+        this.stepPathI++
+        if (pathPoints.length > this.stepPathI) {
+            this.model.position.x = pathPoints[this.stepPathI].x;
+            this.model.position.z = pathPoints[this.stepPathI].z;
+        } else {
+            this.model.isVisible = false;
+        }
+    }
+}
+
 //Can make actions every x milleseconds y times
 function setIntervalX(callback, delay, repetition) {
     var x = 0;
@@ -12,7 +31,7 @@ function setIntervalX(callback, delay, repetition) {
 function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
     return function () {
         if (!scene.isReady()) return;
-        let virusCopy = Object.assign({}, originalVirus);
+        let virusCopy = Object.assign(new Virus, originalVirus);
         virusCopy.model = originalVirus.model.clone("Virus " + virus_array.length);
         virusCopy.model.isVisible = true;
         virusCopy.model.material = towerLevel1;
@@ -89,7 +108,7 @@ window.addEventListener('DOMContentLoaded', function () {
         //first virus (used for cloning)
         let virusSize = 6;
         let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: virusSize}, scene); //make a box
-        var originalVirus = {model: originalVirusMesh, life: 20, speed: 4, pos: ((gridSize - 1) + (gridSize - 1))}; //create an object to save more information
+        let originalVirus = new Virus(originalVirusMesh, 20, 4) //Instantiate an object to save more information
         originalVirus.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map
         originalVirus.model.position.y = hexHeightSize / 2 + virusSize / 2;
         originalVirus.model.isVisible = false;
@@ -159,12 +178,8 @@ window.addEventListener('DOMContentLoaded', function () {
         // Code in this function will run ~60 times per second
         scene.registerBeforeRender(function () {
             // Move all viruses
-            for (let i = 0; i < virus_array.length; i++) {
-                let virus = virus_array[i];
-                let speed = virus.speed / 60;
-
-                virus.model.position.x += speed;
-                virus.model.position.z -= speed;
+            for (let virus of virus_array) {
+                virus.moveToNextPathStep(points);
             }
         });
 
