@@ -6,21 +6,23 @@
 * */
 function createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDistance, rowLengthAddition, hexSpacing, scene) {
     let gridStart = new BABYLON.Vector3(0, 0, 0);
+    let originalHexagon = BABYLON.MeshBuilder.CreateCylinder("hex", {
+        height: hexHeightSize,
+        diameter: hexHeightDistance - hexSpacing,
+        tessellation: 6,
+        updatable: true
+    }, scene)
+    originalHexagon.rotation.y += Math.PI / 6;
+    originalHexagon.checkCollisions = true;
+    originalHexagon.state = "Buildable";
+    originalHexagon.isVisible = false;
+
+
     for (let i = 0; i < (gridSize * 2) - 1; i++) {
         for (let y = 0; y < gridSize + rowLengthAddition; y++) {
-            //var hexagon = BABYLON.Mesh.CreateCylinder("hex", hexHeightSize, hexHeightDistance - hexSpacing, hexHeightDistance - hexSpacing, 6, 1, scene);
-            var hexagon = BABYLON.MeshBuilder.CreateCylinder("hex", {
-                height: hexHeightSize,
-                diameter: hexHeightDistance - hexSpacing,
-                tessellation: 6,
-                updatable: true
-            }, scene)
-            hexagon.rotation.y += Math.PI / 6;
-            hexagon.checkCollisions = true;
-            hexagon.name = "hexTile" + i + y;
-            hexagon.state = "Buildable";
             //hexagon.material.diffuseTexture = new BABYLON.Texture("assets/images/blue.png", scene);
-
+            let hexagon = originalHexagon.clone("hexTile" + i + y);
+            hexagon.isVisible = true;
             hexagon.position.copyFrom(gridStart);
             hexagon.position.x -= hexWidthDistance * y;
         }
