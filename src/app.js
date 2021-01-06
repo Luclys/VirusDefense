@@ -79,10 +79,10 @@ window.addEventListener('DOMContentLoaded', function () {
         //create the hex grid
         createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDistance, rowLengthAddition, hexSpacing, scene);
 
-        let firstHexaMesh = scene.getMeshByName("hexTile00");
-        firstHexaMesh.material = testMaterial;
-        let middleHexaMesh = scene.getMeshByName("hexTile" + (gridSize - 1) + (gridSize - 1));
-        middleHexaMesh.material = testMaterial;
+        let firstHexaMesh = scene.getMeshByName("hexTile_0-0");
+        //firstHexaMesh.material = testMaterial;
+        let middleHexaMesh = scene.getMeshByName("hexTile_" + (gridSize - 1) + "-" + (gridSize - 1));
+        //middleHexaMesh.material = testMaterial;
 
 
         //VIRUS

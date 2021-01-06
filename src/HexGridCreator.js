@@ -21,7 +21,7 @@ function createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDista
     for (let i = 0; i < (gridSize * 2) - 1; i++) {
         for (let y = 0; y < gridSize + rowLengthAddition; y++) {
             //hexagon.material.diffuseTexture = new BABYLON.Texture("assets/images/blue.png", scene);
-            let hexagon = originalHexagon.clone("hexTile" + i + y);
+            let hexagon = originalHexagon.clone("hexTile_" + i + "-" + y);
             hexagon.isVisible = true;
             hexagon.position.copyFrom(gridStart);
             hexagon.position.x -= hexWidthDistance * y;
