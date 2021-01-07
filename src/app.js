@@ -6,18 +6,17 @@ class Virus {
         this.stepPathI = -1;
     }
 
-    moveToNextPathStep(pathPoints) {
+    moveToNextPathStep(path) {
         this.stepPathI++
-        if (pathPoints.length > this.stepPathI) {
-            this.model.position.x = pathPoints[this.stepPathI].x;
-            this.model.position.z = pathPoints[this.stepPathI].z;
-        } else {
-            this.model.isVisible = false;
-        }
+
+        let cursor = new BABYLON.PathCursor(path);
+        cursor.move(0.1);
+        this.model.positions = cursor.getPoint();
+
     }
 }
 
-//Can make actions every x milleseconds y times
+//Can make actions every x milliseconds y times
 function setIntervalX(callback, delay, repetition) {
     var x = 0;
     var intervalID = setInterval(function () {
@@ -105,13 +104,27 @@ window.addEventListener('DOMContentLoaded', function () {
         //middleHexaMesh.material = testMaterial;
 
         // VIRUS' PATH
-        let points = [];
-        let hexSelectedPath = ["hexTile_18-3", "hexTile_17-4", "hexTile_17-5", "hexTile_17-6", "hexTile_16-7", "hexTile_16-8", "hexTile_15-9", "hexTile_15-10", "hexTile_14-11", "hexTile_13-12", "hexTile_13-13", "hexTile_12-14", "hexTile_11-15", "hexTile_10-15", "hexTile_9-16", "hexTile_8-15", "hexTile_8-14", "hexTile_9-14", "hexTile_10-13", "hexTile_10-12", "hexTile_11-11", "hexTile_11-10", "hexTile_12-9", "hexTile_12-8", "hexTile_13-7", "hexTile_13-6", "hexTile_13-5", "hexTile_12-5", "hexTile_11-6", "hexTile_10-7", "hexTile_9-8", "hexTile_9-9", "hexTile_8-9", "hexTile_7-9", "hexTile_6-8", "hexTile_5-8", "hexTile_4-7", "hexTile_4-6", "hexTile_3-5", "hexTile_2-4", "hexTile_2-3", "hexTile_1-2", "hexTile_1-1", "hexTile_0-0"]
-        for (let meshName of hexSelectedPath) {
-            let mesh = scene.getMeshByName(meshName);
+        let path;
+        let hexSelectedPath = ["hexTile_18-3", "hexTile_17-4", "hexTile_17-5", "hexTile_17-6", "hexTile_16-7", "hexTile_16-8", "hexTile_15-9", "hexTile_15-10", "hexTile_14-11", "hexTile_13-12", "hexTile_13-13", "hexTile_12-14", "hexTile_11-15", "hexTile_10-15", "hexTile_9-16", "hexTile_8-15", "hexTile_8-14", "hexTile_9-14", "hexTile_10-13", "hexTile_10-12", "hexTile_11-11", "hexTile_11-10", "hexTile_12-9", "hexTile_12-8", "hexTile_13-7", "hexTile_13-6", "hexTile_13-5", "hexTile_12-5", "hexTile_11-6", "hexTile_10-7", "hexTile_9-8", "hexTile_9-9", "hexTile_8-9", "hexTile_7-9", "hexTile_6-8", "hexTile_5-8", "hexTile_4-7", "hexTile_4-6", "hexTile_3-5", "hexTile_2-4", "hexTile_2-3", "hexTile_1-2", "hexTile_1-1", "hexTile_0-0"];
+        for (let i = 0; i < hexSelectedPath.length; i++) {
+            let mesh = scene.getMeshByName(hexSelectedPath[i]);
+            if (i === 0) {
+                path = new BABYLON.Path2(mesh.position.x, mesh.position.z);
+            }
+            if (i !== hexSelectedPath.length - 1) {
+                let nextMesh = scene.getMeshByName(hexSelectedPath[i + 1]);
+                path.addLineTo(nextMesh.position.x, nextMesh.position.z)
+                //path.createLine(mesh.position, nextMesh.position, 60);
+            }
             mesh.material = testMaterial;
-            points.push(mesh.position);
         }
+        /*
+                for (let meshName of hexSelectedPath) {
+                    let mesh = scene.getMeshByName(meshName);
+                    mesh.material = testMaterial;
+                    points.push(mesh.position);
+                }
+        */
 
         //VIRUS
         //first virus (used for cloning)
@@ -188,7 +201,7 @@ window.addEventListener('DOMContentLoaded', function () {
         scene.registerBeforeRender(function () {
             // Move all viruses
             for (let virus of virus_array) {
-                virus.moveToNextPathStep(points);
+                virus.moveToNextPathStep(path);
             }
         });
 
