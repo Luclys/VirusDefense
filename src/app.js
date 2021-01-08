@@ -1,18 +1,29 @@
 class Virus {
-    constructor(model, life, speed) {
+    constructor(model, life, speed, pathPoints) {
         this.model = model;
         this.life = life;
         this.speed = speed;
-        this.stepPathI = -1;
+        this.pathPoints = pathPoints;
+        this.stepPathI = 0;
+        this.animation = null;
     }
 
-    moveToNextPathStep(path) {
-        this.stepPathI++
+    initiateFollowPath() {
+        let onfulfilled = () => {
+            let fromDest = Object.assign(new BABYLON.Vector3(), this.pathPoints[this.stepPathI]);
+            let towards = Object.assign(new BABYLON.Vector3(), this.pathPoints[this.stepPathI + 1]);
+            fromDest._y += 5;
+            towards._y += 5;
 
-        let cursor = new BABYLON.PathCursor(path);
-        cursor.move(0.1);
-        this.model.positions = cursor.getPoint();
-
+            if (this.pathPoints.length - 1 > this.stepPathI) {
+                this.stepPathI++;
+                this.animation = BABYLON.Animation.CreateAndStartAnimation("anim", this.model, "position", this.speed, 60, fromDest, towards, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+                this.animation.waitAsync().then(onfulfilled);
+            } else {
+                this.model.isVisible = false;
+            }
+        };
+        onfulfilled();
     }
 }
 
@@ -27,6 +38,10 @@ function setIntervalX(callback, delay, repetition) {
     }, delay);
 }
 
+function looseLife(virus) {
+    console.log("Le virus " + virus.name + " a atteint la base, vous perdez " + virus.power + " points de vie.");
+}
+
 function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
     return function () {
         if (!scene.isReady()) return;
@@ -34,6 +49,7 @@ function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
         virusCopy.model = originalVirus.model.clone("Virus " + virus_array.length);
         virusCopy.model.isVisible = true;
         virusCopy.model.material = towerLevel1;
+        virusCopy.initiateFollowPath();
         virus_array.push(virusCopy);
     };
 }
@@ -55,7 +71,6 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // SCENE
         var scene = new BABYLON.Scene(engine);
-        engine.enableOfflineSupport = false;
 
         // LIGHT
         new BABYLON.PointLight("light", new BABYLON.Vector3(50, 30, 30), scene);
@@ -66,8 +81,6 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // CAMERA
         const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 50, 0), scene);
-        camera.cameraDirection = new BABYLON.Vector3(5, 0, 10)
-
         // Enable Collisions
         camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
         scene.collisionsEnabled = true;
@@ -79,9 +92,8 @@ window.addEventListener('DOMContentLoaded', function () {
         camera.keysLeft.push(81);  // Q
         camera.keysDown.push(83);  // S
         camera.keysRight.push(68); // D
-        camera.keysUpward.push(32) // SpaceBar
-        camera.keysDownward.push(16) // Shift
-
+        camera.keysUpward.push(32); // SpaceBar
+        camera.keysDownward.push(16); // Shift
 
         // CONSTRUCTIONS
         // Materials
@@ -94,63 +106,37 @@ window.addEventListener('DOMContentLoaded', function () {
         var testMaterial = new BABYLON.StandardMaterial("material", scene);
         testMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.3);
 
-
         //create the hex grid
         createHexGrid(gridSize, hexHeightSize, hexWidthDistance, hexHeightDistance, rowLengthAddition, hexSpacing, scene);
 
-        let firstHexaMesh = scene.getMeshByName("hexTile_0-0");
-        //firstHexaMesh.material = testMaterial;
-        let middleHexaMesh = scene.getMeshByName("hexTile_" + (gridSize - 1) + "-" + (gridSize - 1));
-        //middleHexaMesh.material = testMaterial;
-
-        // VIRUS' PATH
-        let path;
+        // VIRUSES' PATH
+        let pathPoints = [];
         let hexSelectedPath = ["hexTile_18-3", "hexTile_17-4", "hexTile_17-5", "hexTile_17-6", "hexTile_16-7", "hexTile_16-8", "hexTile_15-9", "hexTile_15-10", "hexTile_14-11", "hexTile_13-12", "hexTile_13-13", "hexTile_12-14", "hexTile_11-15", "hexTile_10-15", "hexTile_9-16", "hexTile_8-15", "hexTile_8-14", "hexTile_9-14", "hexTile_10-13", "hexTile_10-12", "hexTile_11-11", "hexTile_11-10", "hexTile_12-9", "hexTile_12-8", "hexTile_13-7", "hexTile_13-6", "hexTile_13-5", "hexTile_12-5", "hexTile_11-6", "hexTile_10-7", "hexTile_9-8", "hexTile_9-9", "hexTile_8-9", "hexTile_7-9", "hexTile_6-8", "hexTile_5-8", "hexTile_4-7", "hexTile_4-6", "hexTile_3-5", "hexTile_2-4", "hexTile_2-3", "hexTile_1-2", "hexTile_1-1", "hexTile_0-0"];
-        for (let i = 0; i < hexSelectedPath.length; i++) {
-            let mesh = scene.getMeshByName(hexSelectedPath[i]);
-            if (i === 0) {
-                path = new BABYLON.Path2(mesh.position.x, mesh.position.z);
-            }
-            if (i !== hexSelectedPath.length - 1) {
-                let nextMesh = scene.getMeshByName(hexSelectedPath[i + 1]);
-                path.addLineTo(nextMesh.position.x, nextMesh.position.z)
-                //path.createLine(mesh.position, nextMesh.position, 60);
-            }
+        for (let meshName of hexSelectedPath) {
+            let mesh = scene.getMeshByName(meshName);
             mesh.material = testMaterial;
+            mesh.state = "path";
+            pathPoints.push(mesh.position);
         }
-        /*
-                for (let meshName of hexSelectedPath) {
-                    let mesh = scene.getMeshByName(meshName);
-                    mesh.material = testMaterial;
-                    points.push(mesh.position);
-                }
-        */
 
         //VIRUS
         //first virus (used for cloning)
-        let virusSize = 6;
-        let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: virusSize}, scene); //make a box
-        let originalVirus = new Virus(originalVirusMesh, 20, 4) //Instantiate an object to save more information
-        originalVirus.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map
-        originalVirus.model.position.y = hexHeightSize / 2 + virusSize / 2;
+        let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: 6}, scene); //make a box
+        let originalVirus = new Virus(originalVirusMesh, 20, 300, pathPoints); //Instantiate an object to save more information
         originalVirus.model.isVisible = false;
 
-
-        //clone virus and put the copies into virus_array 50 times with 100 ms delay
-        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1, virus_array), 100, 50);
+        //clone virus and put the copies into virus_array 10 times with 1000 ms delay
+        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1, virus_array), 1000, 10);
 
 
         //first turret lv1 (used for cloning)
-        let turretSize = hexHeightSize * 3;
         let originalTurretMesh = BABYLON.MeshBuilder.CreateCylinder("turretLv1_ORIGINAL", {
-            height: turretSize,
+            height: hexHeightSize * 3,
             diameter: (hexHeightDistance - hexSpacing) * 0.20,
             tessellation: 6,
             updatable: true
         }, scene);
         var originalTurret = {model: originalTurretMesh, power: 5, fireRate: 4, projectileSpeed: 9}; //create an object to save more information
-        originalTurret.model.position = middleHexaMesh.position.clone(); //put the box at the middle of the map
-        originalTurret.model.position.y = hexHeightSize / 2 + turretSize / 2;
         originalTurret.model.isVisible = false;
 
         //handling of hex tile picking
@@ -199,10 +185,7 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // Code in this function will run ~60 times per second
         scene.registerBeforeRender(function () {
-            // Move all viruses
-            for (let virus of virus_array) {
-                virus.moveToNextPathStep(path);
-            }
+
         });
 
 
