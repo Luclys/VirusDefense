@@ -21,6 +21,7 @@ class Virus {
                 this.animation.waitAsync().then(onfulfilled);
             } else {
                 this.model.isVisible = false;
+                looseLife(this);
             }
         };
         onfulfilled();
@@ -32,14 +33,14 @@ function setIntervalX(callback, delay, repetition) {
     var x = 0;
     var intervalID = setInterval(function () {
         callback()
-        if (++x === repetition) {
+        if (x++ === repetition) {
             clearInterval(intervalID);
         }
     }, delay);
 }
 
 function looseLife(virus) {
-    console.log("Le virus " + virus.name + " a atteint la base, vous perdez " + virus.power + " points de vie.");
+    console.log("Le virus " + virus.model.name + " a atteint la base, vous perdez 1 point de vie.");
 }
 
 function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
