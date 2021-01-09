@@ -1,3 +1,72 @@
+class StageInventory {
+    constructor(virus_array, turrets_array) {
+        this.life = 5;
+        this.coins = 10;
+        this.virus_array = virus_array; //array when we put all virus
+        this.turrets_array = turrets_array; //array when we put all turrets
+    }
+
+    buildTurretOnMesh(originalTurret, pickedMesh, material = null) {
+        //Update the "placeholder" mesh under the turret from "Buildable" to "TurretLv1".
+        pickedMesh.state = "Turret";
+
+        // We copy the Original Turret to create a new fresh one.
+        let turretCopy = Object.assign(new Turret(), originalTurret);
+
+        turretCopy.model = originalTurret.model.clone("TurretOn" + pickedMesh.name);
+        turretCopy.model.position.copyFrom(pickedMesh.position);
+        turretCopy.model.isVisible = true;
+        if (material != null) turretCopy.model.material = material;
+
+        // The turret is paid then added in the list
+        turretCopy.level = 1;
+        let amount = originalTurret.cost * turretCopy.level
+        this.coins -= amount;
+        turretCopy.value += amount;
+
+        let index = this.turrets_array.push(turretCopy);
+        turretCopy.model.state = index - 1;
+    }
+
+    levelUpTurret(index, turretLevelMaterial = null) {
+        let turret = this.turrets_array[index];
+        turret.level++
+        turret.model.position.y += 3;
+        if (turretLevelMaterial != null) turret.model.material = turretLevelMaterial;
+
+        // The level up is paid
+        let amount = turret.cost * turret.level
+        this.coins -= amount;
+        turret.value += amount;
+    }
+
+    refundTurret(index) {
+        let turret = this.turrets_array[index];
+        turret.model.dispose();
+        this.coins += turret.value;
+        this.turrets_array[index] = null;
+    }
+
+    canBuildTurret(originalTurret, level) {
+        return this.coins >= originalTurret.cost * level;
+    }
+
+    canUpTurret(index) {
+        let turret = this.turrets_array[index];
+        if (turret.level + 1 <= turret.levelmax) {
+            return this.canBuildTurret(turret, turret.level + 1);
+        } else return false;
+    }
+
+    looseLife(virus) {
+        console.log("Le virus " + virus.model.name + " a atteint la base, vous perdez 1 point de vie.");
+        this.life--;
+        if (this.life <= 0) {
+            console.log("You loose");
+        }
+    }
+}
+
 class Virus {
     constructor(model, life, speed, pathPoints) {
         this.model = model;
@@ -8,7 +77,7 @@ class Virus {
         this.animation = null;
     }
 
-    initiateFollowPath() {
+    initiateFollowPath(stageInventory) {
         let onfulfilled = () => {
             let fromDest = Object.assign(new BABYLON.Vector3(), this.pathPoints[this.stepPathI]);
             let towards = Object.assign(new BABYLON.Vector3(), this.pathPoints[this.stepPathI + 1]);
@@ -20,38 +89,36 @@ class Virus {
                 this.animation = BABYLON.Animation.CreateAndStartAnimation("anim", this.model, "position", this.speed, 60, fromDest, towards, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
                 this.animation.waitAsync().then(onfulfilled);
             } else {
-                this.model.isVisible = false;
-                looseLife(this);
+                this.model.dispose();
+                stageInventory.looseLife(this);
             }
         };
         onfulfilled();
     }
 }
 
-//Can make actions every x milliseconds y times
-function setIntervalX(callback, delay, repetition) {
-    var x = 0;
-    var intervalID = setInterval(function () {
-        callback()
-        if (x++ === repetition) {
-            clearInterval(intervalID);
-        }
-    }, delay);
+class Turret {
+    constructor(model, cost, levelmax, power, fireRate, projectileSpeed) {
+        this.model = model;
+        this.cost = cost;
+        this.levelmax = levelmax;
+        this.life = power;
+        this.speed = fireRate;
+        this.pathPoints = projectileSpeed;
+        this.value = 0;
+        this.level = 0;
+    }
 }
 
-function looseLife(virus) {
-    console.log("Le virus " + virus.model.name + " a atteint la base, vous perdez 1 point de vie.");
-}
-
-function createClonedVirus(scene, originalVirus, towerLevel1, virus_array) {
+function createClonedVirus(scene, originalVirus, virusMaterial, stageInventory) {
     return function () {
         if (!scene.isReady()) return;
         let virusCopy = Object.assign(new Virus, originalVirus);
-        virusCopy.model = originalVirus.model.clone("Virus " + virus_array.length);
+        virusCopy.model = originalVirus.model.clone("Virus " + stageInventory.virus_array.length);
         virusCopy.model.isVisible = true;
-        virusCopy.model.material = towerLevel1;
-        virusCopy.initiateFollowPath();
-        virus_array.push(virusCopy);
+        virusCopy.model.material = virusMaterial;
+        virusCopy.initiateFollowPath(stageInventory);
+        stageInventory.virus_array.push(virusCopy);
     };
 }
 
@@ -98,11 +165,11 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // CONSTRUCTIONS
         // Materials
-        var turretLevel1 = new BABYLON.StandardMaterial("material", scene);
-        turretLevel1.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.9);
+        var turretLevel1Material = new BABYLON.StandardMaterial("material", scene);
+        turretLevel1Material.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.9);
 
-        var towerLevel2 = new BABYLON.StandardMaterial("material", scene);
-        towerLevel2.emissiveColor = new BABYLON.Color3(0.2, 0.4, 0.9);
+        var turretLevel2Material = new BABYLON.StandardMaterial("material", scene);
+        turretLevel2Material.emissiveColor = new BABYLON.Color3(0.2, 0.4, 0.9);
 
         var testMaterial = new BABYLON.StandardMaterial("material", scene);
         testMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.4, 0.3);
@@ -120,81 +187,71 @@ window.addEventListener('DOMContentLoaded', function () {
             pathPoints.push(mesh.position);
         }
 
-        //VIRUS
-        //first virus (used for cloning)
+        // VIRUS
+        // first virus (used for cloning)
         let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: 6}, scene); //make a box
+        originalVirusMesh.isVisible = false;
         let originalVirus = new Virus(originalVirusMesh, 20, 300, pathPoints); //Instantiate an object to save more information
-        originalVirus.model.isVisible = false;
 
         //clone virus and put the copies into virus_array 10 times with 1000 ms delay
-        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1, virus_array), 1000, 10);
+        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1Material, stageInventory), 1000, 10);
 
 
-        //first turret lv1 (used for cloning)
+        // TURRETS
+        // first turret lv1 (used for cloning)
         let originalTurretMesh = BABYLON.MeshBuilder.CreateCylinder("turretLv1_ORIGINAL", {
             height: hexHeightSize * 3,
             diameter: (hexHeightDistance - hexSpacing) * 0.20,
             tessellation: 6,
             updatable: true
         }, scene);
-        var originalTurret = {model: originalTurretMesh, power: 5, fireRate: 4, projectileSpeed: 9}; //create an object to save more information
-        originalTurret.model.isVisible = false;
+        originalTurretMesh.isVisible = false;
+        var originalTurret = new Turret(originalTurretMesh, 5, 11, 5, 4, 9);//create an object to save more information
 
         //handling of hex tile picking
         scene.onPointerDown = function (event, pickResult) {
             let pickedMesh = pickResult.pickedMesh
             // If a Mesh is picked with Left clic (main button)
             // 1 -> Middle Clic, 2 -> right Clic
-            if (pickedMesh && event.button === 0) {
+            if (pickedMesh && (event.button === 0 || event.button === 2)) {
                 let state = pickedMesh.state;
-                console.log("You picked the " + pickedMesh.name + " it has the state : " + state);
-                switch (pickedMesh.state) {
+                console.log("You picked the " + pickedMesh.name + " it has the state : " + state, "Current coins : " + stageInventory.coins);
+                switch (state) {
                     case "Buildable" :
-                        // We copy the Original Turret to create a new fresh one.
-                        let turretCopy = Object.assign({}, originalTurret);
-                        turretCopy.model = originalTurret.model.clone("turretLv1On" + pickedMesh.name)
-                        turretCopy.model.position.copyFrom(pickedMesh.position);
-                        turretCopy.model.material = turretLevel1;
-                        turretCopy.model.isVisible = true;
-
-                        turrets_array.push(turretCopy);
-
-                        //Update the "placeholder" mesh under the turret from "Buildable" to "TurretLv1".
-                        pickedMesh.state = "TurretLv1";
-                        //console.log("Building a Level 1 turret on top of " + pickedMesh.name)
+                        if (stageInventory.canBuildTurret(originalTurret, 1)) {
+                            console.log("On peut build la turret")
+                            stageInventory.buildTurretOnMesh(originalTurret, pickedMesh, turretLevel1Material)
+                        }
                         break;
-                    case "TurretLv1" :
-                        let turretLv1 = scene.getMeshByName("turretLv1On" + pickedMesh.name);
-                        turretLv1.name = "turretLv2On" + pickedMesh.name;
-                        turretLv1.material = towerLevel2;
-                        turretLv1.position.y += hexHeightSize;
-
-                        //Update the "placeholder" mesh under the turret from "TurretLv1" to "TurretLv2".
-                        pickedMesh.state = "TurretLv2";
-                        //console.log("Building a Level 2 turret on top of " + pickedMesh.name)
+                    case "Turret" :
+                        let index = scene.getMeshByName("TurretOn" + pickedMesh.name).state;
+                        if (event.button === 0) {
+                            if (stageInventory.canUpTurret(index)) {
+                                console.log("On peut lvlup la turret")
+                                stageInventory.levelUpTurret(index, turretLevel2Material)
+                            }
+                        } else {
+                            pickedMesh.state = "Buildable";
+                            stageInventory.refundTurret(index);
+                        }
                         break;
-                    case "TurretLv2" :
-                        console.log("You can't upgrade this turret");
                 }
-
-                if (state !== pickedMesh.state) {
-                    console.log("new State = " + pickedMesh.state);
-                }
-
+                console.log("new State = " + pickedMesh.state + "Current coins : " + stageInventory.coins);
             }
         };
 
         // Code in this function will run ~60 times per second
         scene.registerBeforeRender(function () {
-
         });
 
 
         return scene;
     };
 
-    var virus_array = []; //array when we put all virus
-    var turrets_array = []; //array when we put all turrets
+    var virus_array = new Array(Virus); //array when we put all virus
+    var turrets_array = new Array(Turret); //array when we put all turrets
+
+    var stageInventory = new StageInventory(virus_array, turrets_array);
 
     let scene = createScene();
 
@@ -202,3 +259,14 @@ window.addEventListener('DOMContentLoaded', function () {
         scene.render();
     });
 });
+
+//Can make actions every x milliseconds y times
+function setIntervalX(callback, delay, repetition) {
+    var x = 0;
+    var intervalID = setInterval(function () {
+        callback()
+        if (++x === repetition) {
+            clearInterval(intervalID);
+        }
+    }, delay);
+}
