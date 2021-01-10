@@ -1,7 +1,7 @@
 class StageInventory {
     constructor(virus_array, turrets_array) {
         this.life = 5;
-        this.coins = 70;
+        this.coins = 15;
         this.virus_array = virus_array; //array when we put all virus
         this.turrets_array = turrets_array; //array when we put all turrets
     }
@@ -38,9 +38,9 @@ class StageInventory {
         turret.level++
 
         turret.power += 5
-        turret.fireRate += 10;
+        turret.fireRate -= 0.2;
         turret.projectileSpeed += 10;
-        turret.detectionRange += 50;
+        turret.detectionRange += 10;
         turret.updateDetectionRing();
 
         // The level up is paid
@@ -78,9 +78,10 @@ class StageInventory {
 }
 
 class Virus {
-    constructor(model, life, speed, pathPoints) {
+    constructor(model, life, value, speed, pathPoints) {
         this.model = model;
         this.life = life;
+        this.value = value;
         this.speed = speed;
         this.pathPoints = pathPoints;
         this.stepPathI = 0;
@@ -94,13 +95,19 @@ class Virus {
             fromDest._y += 5;
             towards._y += 5;
 
-            if (this.pathPoints.length - 1 > this.stepPathI) {
-                this.stepPathI++;
-                this.animation = BABYLON.Animation.CreateAndStartAnimation("anim", this.model, "position", this.speed, 60, fromDest, towards, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
-                this.animation.waitAsync().then(onfulfilled);
+
+            if (this.life > 0) {
+                if (this.pathPoints.length - 1 > this.stepPathI) {
+                    this.stepPathI++;
+                    this.animation = BABYLON.Animation.CreateAndStartAnimation("anim", this.model, "position", this.speed, 60, fromDest, towards, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+                    this.animation.waitAsync().then(onfulfilled);
+                } else {
+                    this.model.dispose();
+                    stageInventory.looseLife(this);
+                }
             } else {
                 this.model.dispose();
-                stageInventory.looseLife(this);
+                this.animation = null;
             }
         };
         onfulfilled();
@@ -119,11 +126,12 @@ class Turret {
         this.value = 0;
         this.level = 0;
         this.detectionRingMesh = null;
+        this.lastShotTime = null;
     }
 
     createDetectionRing() {
         let scene = this.model.scene;
-        this.detectionRingMesh = BABYLON.Mesh.CreateTorus("torus", this.detectionRange, 0.1, 10, scene, true);
+        this.detectionRingMesh = BABYLON.Mesh.CreateTorus("torus", this.detectionRange + this.detectionRange / 2, 0.1, 10, scene, true);
         this.detectionRingMesh.position.copyFrom(this.model.position);
         this.detectionRingMesh.position.y = 2.5;
     }
@@ -132,6 +140,29 @@ class Turret {
         if (this.detectionRingMesh.diameter !== this.detectionRange) {
             this.detectionRingMesh.dispose();
             this.createDetectionRing();
+        }
+    }
+
+    shootInRange(stageInventory) {
+        let timeNow = Date.now();
+        let timePassed = (timeNow - this.lastShotTime) / 1000;
+
+        if (timePassed >= this.fireRate) {
+            for (let i = 0; i < stageInventory.virus_array.length; i++) {
+                let virus = stageInventory.virus_array[i];
+                if (virus == null) continue;
+                if (distance(virus.model.position, this.model.position) <= this.detectionRange) {
+                    virus.life -= this.power;
+                    console.log("fired, vie restante : " + virus.life);
+                    if (virus.life <= 0) {
+                        virus.model.dispose();
+                        console.log("Virus " + virus.model.state + " Destroyed.")
+                        stageInventory.coins += virus.value;
+                        stageInventory.virus_array[i] = null;
+                    }
+                }
+                this.lastShotTime = timeNow;
+            }
         }
     }
 }
@@ -143,6 +174,7 @@ function createClonedVirus(scene, originalVirus, virusMaterial, stageInventory) 
         virusCopy.model = originalVirus.model.clone("Virus " + stageInventory.virus_array.length);
         virusCopy.model.isVisible = true;
         virusCopy.model.material = virusMaterial;
+        virusCopy.checkCollisions = true;
         virusCopy.initiateFollowPath(stageInventory);
         stageInventory.virus_array.push(virusCopy);
     };
@@ -178,7 +210,7 @@ window.addEventListener('DOMContentLoaded', function () {
         // Enable Collisions
         camera.ellipsoid = new BABYLON.Vector3(1, 1, 1);
         scene.collisionsEnabled = true;
-        camera.checkCollisions = false;
+        camera.checkCollisions = true;
 
         // Custom Controls
         camera.attachControl(scene, true);
@@ -217,10 +249,10 @@ window.addEventListener('DOMContentLoaded', function () {
         // first virus (used for cloning)
         let originalVirusMesh = BABYLON.MeshBuilder.CreateBox("virus_ORIGINAL", {size: 6}, scene); //make a box
         originalVirusMesh.isVisible = false;
-        let originalVirus = new Virus(originalVirusMesh, 20, 300, pathPoints); //Instantiate an object to save more information
+        let originalVirus = new Virus(originalVirusMesh, 70, 3, 200, pathPoints); //Instantiate an object to save more information
 
         //clone virus and put the copies into virus_array 10 times with 1000 ms delay
-        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1Material, stageInventory), 1000, 10);
+        setIntervalX(createClonedVirus(scene, originalVirus, turretLevel1Material, stageInventory), 3000, 40);
 
 
         // TURRETS
@@ -232,7 +264,7 @@ window.addEventListener('DOMContentLoaded', function () {
             updatable: true
         }, scene);
         originalTurretMesh.isVisible = false;
-        var originalTurret = new Turret(originalTurretMesh, 5, 5, 5, 4, 9, 50);//create an object to save more information
+        var originalTurret = new Turret(originalTurretMesh, 5, 5, 3, 1, 9, 50);//create an object to save more information
 
         //handling of hex tile picking
         scene.onPointerDown = function (event, pickResult) {
@@ -268,14 +300,19 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // Code in this function will run ~60 times per second
         scene.registerBeforeRender(function () {
+            for (let i = 0; i < turrets_array.length; i++) {
+                let turret = turrets_array[i];
+                if (turret == null) continue;
+                turret.shootInRange(stageInventory);
+            }
         });
 
 
         return scene;
     };
 
-    var virus_array = new Array(Virus); //array when we put all virus
-    var turrets_array = new Array(Turret); //array when we put all turrets
+    var virus_array = []; //array when we put all virus
+    var turrets_array = []; //array when we put all turrets
 
     var stageInventory = new StageInventory(virus_array, turrets_array);
 
@@ -295,4 +332,13 @@ function setIntervalX(callback, delay, repetition) {
             clearInterval(intervalID);
         }
     }, delay);
+}
+
+// Return the distance between two coordinates.
+function distance(pos3_1, pos3_2) {
+    let x1 = pos3_1.x;
+    let x2 = pos3_2.x;
+    let y1 = pos3_1.z;
+    let y2 = pos3_2.z;
+    return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
 }
