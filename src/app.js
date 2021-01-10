@@ -1,7 +1,7 @@
 class StageInventory {
     constructor(virus_array, turrets_array) {
         this.life = 5;
-        this.coins = 10;
+        this.coins = 70;
         this.virus_array = virus_array; //array when we put all virus
         this.turrets_array = turrets_array; //array when we put all turrets
     }
@@ -11,28 +11,37 @@ class StageInventory {
         pickedMesh.state = "Turret";
 
         // We copy the Original Turret to create a new fresh one.
-        let turretCopy = Object.assign(new Turret(), originalTurret);
+        let turret = Object.assign(new Turret(), originalTurret);
 
-        turretCopy.model = originalTurret.model.clone("TurretOn" + pickedMesh.name);
-        turretCopy.model.position.copyFrom(pickedMesh.position);
-        turretCopy.model.isVisible = true;
-        if (material != null) turretCopy.model.material = material;
+        turret.model = originalTurret.model.clone("TurretOn" + pickedMesh.name);
+        turret.model.position.copyFrom(pickedMesh.position);
+        turret.model.isVisible = true;
+        if (material != null) turret.model.material = material;
+
+        // Building the Turret's detection ring
+        turret.createDetectionRing();
 
         // The turret is paid then added in the list
-        turretCopy.level = 1;
-        let amount = originalTurret.cost * turretCopy.level
+        turret.level = 1;
+        let amount = originalTurret.cost * turret.level
         this.coins -= amount;
-        turretCopy.value += amount;
+        turret.value += amount;
 
-        let index = this.turrets_array.push(turretCopy);
-        turretCopy.model.state = index - 1;
+        let index = this.turrets_array.push(turret);
+        turret.model.state = index - 1;
     }
 
     levelUpTurret(index, turretLevelMaterial = null) {
         let turret = this.turrets_array[index];
-        turret.level++
-        turret.model.position.y += 3;
         if (turretLevelMaterial != null) turret.model.material = turretLevelMaterial;
+        turret.model.position.y += 3;
+        turret.level++
+
+        turret.power += 5
+        turret.fireRate += 10;
+        turret.projectileSpeed += 10;
+        turret.detectionRange += 50;
+        turret.updateDetectionRing();
 
         // The level up is paid
         let amount = turret.cost * turret.level
@@ -43,6 +52,7 @@ class StageInventory {
     refundTurret(index) {
         let turret = this.turrets_array[index];
         turret.model.dispose();
+        turret.detectionRingMesh.dispose();
         this.coins += turret.value;
         this.turrets_array[index] = null;
     }
@@ -53,7 +63,7 @@ class StageInventory {
 
     canUpTurret(index) {
         let turret = this.turrets_array[index];
-        if (turret.level + 1 <= turret.levelmax) {
+        if (turret.level + 1 <= turret.levelMax) {
             return this.canBuildTurret(turret, turret.level + 1);
         } else return false;
     }
@@ -98,15 +108,31 @@ class Virus {
 }
 
 class Turret {
-    constructor(model, cost, levelmax, power, fireRate, projectileSpeed) {
+    constructor(model, cost, levelMax, power, fireRate, projectileSpeed, detectionRange) {
         this.model = model;
         this.cost = cost;
-        this.levelmax = levelmax;
-        this.life = power;
-        this.speed = fireRate;
-        this.pathPoints = projectileSpeed;
+        this.levelMax = levelMax;
+        this.power = power;
+        this.fireRate = fireRate;
+        this.projectileSpeed = projectileSpeed;
+        this.detectionRange = detectionRange;
         this.value = 0;
         this.level = 0;
+        this.detectionRingMesh = null;
+    }
+
+    createDetectionRing() {
+        let scene = this.model.scene;
+        this.detectionRingMesh = BABYLON.Mesh.CreateTorus("torus", this.detectionRange, 0.1, 10, scene, true);
+        this.detectionRingMesh.position.copyFrom(this.model.position);
+        this.detectionRingMesh.position.y = 2.5;
+    }
+
+    updateDetectionRing() {
+        if (this.detectionRingMesh.diameter !== this.detectionRange) {
+            this.detectionRingMesh.dispose();
+            this.createDetectionRing();
+        }
     }
 }
 
@@ -206,7 +232,7 @@ window.addEventListener('DOMContentLoaded', function () {
             updatable: true
         }, scene);
         originalTurretMesh.isVisible = false;
-        var originalTurret = new Turret(originalTurretMesh, 5, 11, 5, 4, 9);//create an object to save more information
+        var originalTurret = new Turret(originalTurretMesh, 5, 5, 5, 4, 9, 50);//create an object to save more information
 
         //handling of hex tile picking
         scene.onPointerDown = function (event, pickResult) {
