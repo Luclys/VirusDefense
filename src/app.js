@@ -1,9 +1,10 @@
 class StageInventory {
-    constructor(virus_array, turrets_array) {
+    constructor(virus_array, turrets_array, engine) {
         this.life = 5;
         this.coins = 15;
         this.virus_array = virus_array; //array when we put all virus
         this.turrets_array = turrets_array; //array when we put all turrets
+        this.engine = engine; //array when we put all turrets
     }
 
     buildTurretOnMesh(originalTurret, pickedMesh, material = null) {
@@ -73,6 +74,8 @@ class StageInventory {
         this.life--;
         if (this.life <= 0) {
             console.log("You loose");
+            alert("No more remaining lives, you loose.")
+            this.engine.stopRenderLoop();
         }
     }
 }
@@ -131,7 +134,7 @@ class Turret {
 
     createDetectionRing() {
         let scene = this.model.scene;
-        this.detectionRingMesh = BABYLON.Mesh.CreateTorus("torus", this.detectionRange + this.detectionRange / 2, 0.1, 10, scene, true);
+        this.detectionRingMesh = BABYLON.Mesh.CreateTorus("torus", this.detectionRange + this.detectionRange / 2, 0.1, 30, scene, true);
         this.detectionRingMesh.position.copyFrom(this.model.position);
         this.detectionRingMesh.position.y = 2.5;
     }
@@ -314,7 +317,7 @@ window.addEventListener('DOMContentLoaded', function () {
     var virus_array = []; //array when we put all virus
     var turrets_array = []; //array when we put all turrets
 
-    var stageInventory = new StageInventory(virus_array, turrets_array);
+    var stageInventory = new StageInventory(virus_array, turrets_array, engine);
 
     let scene = createScene();
 
